@@ -1,4 +1,3 @@
-
 #include <mpi.h>
 #include <omp.h>
 #include <stdio.h>
@@ -29,6 +28,7 @@ int main(int argc, char *argv[]) {
   int n; // Tamaño del vector
   double *vec_a = NULL, *vec_b = NULL;
   double local_sum = 0.0, global_sum = 0.0;
+  double start_time, end_time, parallel_time, sequential_time;
 
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -69,6 +69,13 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < n; i++)
       printf("%.2f ", vec_b[i]);
     printf("\n");
+
+    // Medir el tiempo secuencial
+    start_time = MPI_Wtime();
+    global_sum = dot_product(vec_a, vec_b, n);
+    end_time = MPI_Wtime();
+    sequential_time = end_time - start_time;
+    printf("Tiempo secuencial: %f segundos\n", sequential_time);
   }
 
   // Distribuir los datos a los procesos
@@ -78,7 +85,10 @@ int main(int argc, char *argv[]) {
               MPI_COMM_WORLD);
 
   // Calcular producto escalar local
+  start_time = MPI_Wtime();
   local_sum = dot_product(local_a, local_b, local_n);
+  end_time = MPI_Wtime();
+  parallel_time = end_time - start_time;
 
   // Reducir los resultados locales en el proceso maestro
   MPI_Reduce(&local_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, 0,
@@ -87,6 +97,14 @@ int main(int argc, char *argv[]) {
   // Mostrar el resultado en el proceso maestro
   if (rank == 0) {
     printf("Producto escalar: %f\n", global_sum);
+    printf("Tiempo paralelo: %f segundos\n", parallel_time);
+
+    // Calcular speedup y eficiencia
+    double speedup = sequential_time / parallel_time;
+    double efficiency = speedup / size;
+    printf("Speedup: %f\n", speedup);
+    printf("Eficiencia: %f\n", efficiency);
+
     free(vec_a);
     free(vec_b);
   }

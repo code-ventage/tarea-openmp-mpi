@@ -1,4 +1,3 @@
-
 #include <mpi.h>
 #include <omp.h>
 #include <stdio.h>
@@ -34,6 +33,7 @@ void print_vector(int *vector, int size) {
 int main(int argc, char *argv[]) {
   int rank, size;
   int rows, cols;
+  double start_time, end_time, parallel_time, serial_time;
 
   // Inicializar MPI
   MPI_Init(&argc, &argv);
@@ -67,10 +67,8 @@ int main(int argc, char *argv[]) {
   }
 
   // Calcular cuántas filas le tocan a cada proceso
-  int *send_counts = (int *)malloc(
-      size * sizeof(int)); // Número de elementos a enviar a cada proceso
-  int *displs =
-      (int *)malloc(size * sizeof(int)); // Desplazamientos para cada proceso
+  int *send_counts = (int *)malloc(size * sizeof(int)); // Número de elementos a enviar a cada proceso
+  int *displs = (int *)malloc(size * sizeof(int)); // Desplazamientos para cada proceso
   int rows_per_process = rows / size;
   int remaining_rows = rows % size;
 
@@ -84,12 +82,14 @@ int main(int argc, char *argv[]) {
   local_matrix = (int *)malloc(send_counts[rank] * sizeof(int));
   local_sums = (int *)malloc(local_rows * sizeof(int));
 
-  // Distribuir partes de la matriz a cada proceso
-  MPI_Scatterv(matrix, send_counts, displs, MPI_INT, local_matrix,
-               send_counts[rank], MPI_INT, 0, MPI_COMM_WORLD);
+  // Medir el tiempo de inicio
+  start_time = MPI_Wtime();
 
-// Calcular la suma de las filas localmente usando OpenMP
-#pragma omp parallel for
+  // Distribuir partes de la matriz a cada proceso
+  MPI_Scatterv(matrix, send_counts, displs, MPI_INT, local_matrix, send_counts[rank], MPI_INT, 0, MPI_COMM_WORLD);
+
+  // Calcular la suma de las filas localmente usando OpenMP
+  #pragma omp parallel for
   for (int i = 0; i < local_rows; i++) {
     local_sums[i] = 0;
     for (int j = 0; j < cols; j++) {
@@ -98,23 +98,44 @@ int main(int argc, char *argv[]) {
   }
 
   // Reunir las sumas locales en el proceso 0
-  int *recv_counts =
-      (int *)malloc(size * sizeof(int)); // Filas a recibir de cada proceso
-  int *recv_displs =
-      (int *)malloc(size * sizeof(int)); // Desplazamientos para recopilar
+  int *recv_counts = (int *)malloc(size * sizeof(int)); // Filas a recibir de cada proceso
+  int *recv_displs = (int *)malloc(size * sizeof(int)); // Desplazamientos para recopilar
 
   for (int i = 0; i < size; i++) {
     recv_counts[i] = send_counts[i] / cols; // Convertir elementos en filas
     recv_displs[i] = (i == 0) ? 0 : recv_displs[i - 1] + recv_counts[i - 1];
   }
 
-  MPI_Gatherv(local_sums, local_rows, MPI_INT, global_sums, recv_counts,
-              recv_displs, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Gatherv(local_sums, local_rows, MPI_INT, global_sums, recv_counts, recv_displs, MPI_INT, 0, MPI_COMM_WORLD);
+
+  // Medir el tiempo de finalización
+  end_time = MPI_Wtime();
+  parallel_time = end_time - start_time;
 
   // Proceso 0 imprime el resultado
   if (rank == 0) {
     printf("Vector de sumas por fila:\n");
     print_vector(global_sums, rows);
+
+    // Calcular el tiempo en serie
+    start_time = MPI_Wtime();
+    int *serial_sums = (int *)malloc(rows * sizeof(int));
+    for (int i = 0; i < rows; i++) {
+      serial_sums[i] = 0;
+      for (int j = 0; j < cols; j++) {
+        serial_sums[i] += matrix[i * cols + j];
+      }
+    }
+    end_time = MPI_Wtime();
+    serial_time = end_time - start_time;
+
+    // Calcular y mostrar el speedup
+    double speedup = serial_time / parallel_time;
+    printf("Tiempo en serie: %f segundos\n", serial_time);
+    printf("Tiempo en paralelo: %f segundos\n", parallel_time);
+    printf("Speedup: %f\n", speedup);
+
+    free(serial_sums);
   }
 
   // Liberar memoria
