@@ -32,7 +32,7 @@ void print_vector(int *vector, int size) {
 }
 
 double read_seq_time_from_file() {
-  FILE *time_file = fopen("time_seq.txt", "r");
+  FILE *time_file = fopen("time_seq_1.txt", "r");
   double seq_time = 0.0;
   fscanf(time_file, "%lf", &seq_time);
   return seq_time;
@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
 
   // Proceso 0 inicializa la matriz
   if (rank == 0) {
-    start_time = omp_get_wtime();
+    start_time = MPI_Wtime();
     matrix = (int *)malloc(rows * cols * sizeof(int));
     global_sums = (int *)malloc(rows * sizeof(int));
     initialize_matrix(matrix, rows, cols);
@@ -126,11 +126,11 @@ int main(int argc, char *argv[]) {
     print_vector(global_sums, rows);
   }
 
-  double end_time = omp_get_wtime();
-  double time_spent = end_time - start_time;
-  double seq_time = read_seq_time_from_file();
+  double end_time = MPI_Wtime();
 
   if (rank == 0) {
+    double time_spent = end_time - start_time;
+    double seq_time = read_seq_time_from_file();
     printf("Speedup: %lf\n", seq_time / time_spent);
   }
 

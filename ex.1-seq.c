@@ -21,7 +21,7 @@ void print_matrix(int *matrix, int rows, int cols) {
 }
 
 void write_time_to_file(double time_spent) {
-  FILE *time_file = fopen("time_seq.txt", "w");
+  FILE *time_file = fopen("time_seq_1.txt", "w");
   if (time_file == NULL) {
     perror("Error opening file");
     return;
@@ -31,7 +31,6 @@ void write_time_to_file(double time_spent) {
 }
 
 int main(int argc, char *argv[]) {
-  srand(time(NULL));
   clock_t start = clock();
   // code start
   double time_spent = 0.0;
