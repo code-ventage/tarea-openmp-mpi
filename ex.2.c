@@ -50,6 +50,8 @@ int main(int argc, char *argv[]) {
   // Transmitir el tamaño del vector a todos los procesos MPI_Bcast(&n, 1,
   // MPI_INT, 0, MPI_COMM_WORLD);
 
+  MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
   // División del trabajo
   int local_n = n / size; // Tamaño del subvector para cada proceso
   if (rank == size - 1)
